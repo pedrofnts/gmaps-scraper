@@ -24,7 +24,7 @@ async function getCoordinates(cep) {
 
 async function searchValueSERP(latitude, longitude, page) {
   const params = {
-    api_key: process.env.APIKEY,
+    api_key: "5B294ADCEB7E4E1C93355F07183302DA",
     search_type: "places",
     q: "restaurante",
     google_domain: "google.com.br",

@@ -1,15 +1,29 @@
+const path = require("path");
 require("dotenv").config({ path: "../.env" });
+
+console.log("Current Working Directory:", process.cwd());
+
+console.log(process.env.APIKEY);
+console.log(process.env.BASE_URL);
+
+const csvFilePath = path.join(__dirname, "data", "sp", "sp1.csv");
+const outputCsvFilePath = path.join(__dirname, "..", "results", "output.csv");
+const summaryOutputCsvFilePath = path.join(
+  __dirname,
+  "..",
+  "results",
+  "summary_output.csv"
+);
 
 const {
   appendToCSV,
   loadExistingPlaceIds,
   initializeCsvFiles,
   getCsvStringifier,
+  readCEPsFromCSV,
 } = require("./handlers/csvHandler");
 const { getCoordinates, searchValueSERP } = require("./handlers/apiHandler");
 const { formatOpeningHours } = require("./utils/format");
-
-const ceps = ["01001000", "01002000", "01008000", "01008000"];
 
 const csvStringifier = getCsvStringifier([
   { id: "cep", title: "CEP" },
@@ -21,12 +35,10 @@ const csvStringifier = getCsvStringifier([
   { id: "city", title: "City" },
   { id: "state", title: "State" },
   { id: "phone", title: "Phone" },
-  { id: "current_opening_hours", title: "Current Opening Hours" },
   { id: "rating", title: "Rating" },
   { id: "reviews", title: "Reviews" },
   { id: "latitude", title: "Latitude" },
   { id: "longitude", title: "Longitude" },
-  { id: "per_day_opening_hours", title: "Per Day Opening Hours" },
 ]);
 
 const summaryCsvStringifier = getCsvStringifier([
@@ -37,84 +49,87 @@ const summaryCsvStringifier = getCsvStringifier([
   { id: "num_restaurants", title: "Number of Restaurants" },
 ]);
 
-initializeCsvFiles("../results/output.csv", csvStringifier);
-initializeCsvFiles("../results/summary_output.csv", summaryCsvStringifier);
+initializeCsvFiles(outputCsvFilePath, csvStringifier);
+initializeCsvFiles(summaryOutputCsvFilePath, summaryCsvStringifier);
 
-loadExistingPlaceIds("../results/output.csv");
-
-let existingPlaceIds = new Set();
+loadExistingPlaceIds(outputCsvFilePath);
 
 async function main() {
-  for (const cep of ceps) {
-    const { latitude, longitude, city, state, status } = await getCoordinates(
-      cep
-    );
-    let numRestaurants = 0;
-    let continueFetching = status === "Success";
-    let currentPage = 1;
+  try {
+    const ceps = await readCEPsFromCSV(csvFilePath);
 
-    while (continueFetching) {
-      console.log(
-        `Consultando ValueSERP: Coordenadas (${latitude}, ${longitude}), Página ${currentPage}`
+    for (const cep of ceps) {
+      const { latitude, longitude, city, state, status } = await getCoordinates(
+        cep
       );
-      const response = await searchValueSERP(latitude, longitude, currentPage);
+      let numRestaurants = 0;
+      let continueFetching = status === "Success";
+      let currentPage = 1;
 
-      if (response && response.places_results) {
-        numRestaurants += response.places_results.length;
-        response.places_results.forEach((place) => {
-          const perDayHours =
-            place.opening_hours && place.opening_hours.per_day
-              ? formatOpeningHours(place.opening_hours.per_day)
-              : "";
-          const record = {
-            cep,
-            position: place.position,
-            title: place.title,
-            link: place.link,
-            place_id: place.place_id,
-            address: place.address,
-            city,
-            state,
-            phone: place.phone,
-            current_opening_hours: place.opening_hours
-              ? place.opening_hours.current
-              : "",
-            rating: place.rating,
-            reviews: place.reviews,
-            latitude: place.gps_coordinates.latitude,
-            longitude: place.gps_coordinates.longitude,
-            per_day_opening_hours: perDayHours,
-          };
-
-          appendToCSV(record, csvStringifier, "../results/output.csv");
-        });
-
-        continueFetching = response.places_results.length === 20;
-      } else {
+      while (continueFetching) {
         console.log(
-          `ValueSERP Página ${currentPage}: Sem mais resultados ou erro na requisição.`
+          `Consultando ValueSERP: Coordenadas (${latitude}, ${longitude}), Página ${currentPage}`
         );
-        continueFetching = false;
+        const response = await searchValueSERP(
+          latitude,
+          longitude,
+          currentPage
+        );
+
+        if (response && response.places_results) {
+          numRestaurants += response.places_results.length;
+          response.places_results.forEach((place) => {
+            const perDayHours =
+              place.opening_hours && place.opening_hours.per_day
+                ? formatOpeningHours(place.opening_hours.per_day)
+                : "";
+            const record = {
+              cep,
+              position: place.position,
+              title: place.title,
+              link: place.link,
+              place_id: place.place_id,
+              address: place.address,
+              city,
+              state,
+              phone: place.phone,
+              rating: place.rating,
+              reviews: place.reviews,
+              latitude: place.gps_coordinates.latitude,
+              longitude: place.gps_coordinates.longitude,
+            };
+
+            appendToCSV(record, csvStringifier, outputCsvFilePath);
+          });
+
+          continueFetching = response.places_results.length === 20;
+        } else {
+          console.log(
+            `ValueSERP Página ${currentPage}: Sem mais resultados ou erro na requisição.`
+          );
+          continueFetching = false;
+        }
+
+        currentPage++;
       }
 
-      currentPage++;
+      const summaryRecord = {
+        cep,
+        latitude,
+        longitude,
+        status,
+        num_restaurants: numRestaurants,
+      };
+      awaitappendToCSV(
+        summaryRecord,
+        summaryCsvStringifier,
+        summaryCsvFilePath
+      );
     }
-
-    const summaryRecord = {
-      cep,
-      latitude,
-      longitude,
-      status,
-      num_restaurants: numRestaurants,
-    };
-    appendToCSV(
-      summaryRecord,
-      summaryCsvStringifier,
-      "../results/summary_output.csv"
-    );
+    console.log("Processo concluído.");
+  } catch (error) {
+    console.error("Erro ao ler CEPs do CSV:", error.message);
   }
-
-  console.log("Processo concluído.");
 }
 
 main();

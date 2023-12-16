@@ -35,6 +35,8 @@ async function searchValueSERP(latitude, longitude, page) {
     page,
   };
 
+  console.log(params);
+
   try {
     const response = await axios.get("https://api.valueserp.com/search", {
       params,

@@ -1,13 +1,31 @@
 const path = require("path");
 require("dotenv").config({ path: "../.env" });
 
-console.log("Current Working Directory:", process.cwd());
+const listName = process.argv[2];
 
-console.log(process.env.APIKEY);
-console.log(process.env.BASE_URL);
+if (!listName || !["sp1", "rj1", "mg1", "es1"].includes(listName)) {
+  console.error(
+    "Por favor, forneça um nome de lista válido: sp1, rj1, mg1, ou es1"
+  );
+  process.exit(1);
+}
 
-const csvFilePath = path.join(__dirname, "data", "sp", "sp1.csv");
-const outputCsvFilePath = path.join(__dirname, "..", "results", "output.csv");
+const subdirectory = listName.substring(0, 2);
+
+const csvFilePath = path.join(
+  __dirname,
+  ".",
+  "data",
+  subdirectory,
+  `${listName}.csv`
+);
+
+const outputCsvFilePath = path.join(
+  __dirname,
+  "..",
+  "results",
+  `${listName}_output.csv`
+);
 const summaryOutputCsvFilePath = path.join(
   __dirname,
   "..",
@@ -120,11 +138,7 @@ async function main() {
         status,
         num_restaurants: numRestaurants,
       };
-      awaitappendToCSV(
-        summaryRecord,
-        summaryCsvStringifier,
-        summaryCsvFilePath
-      );
+      appendToCSV(summaryRecord, summaryCsvStringifier, summaryCsvFilePath);
     }
     console.log("Processo concluído.");
   } catch (error) {
@@ -132,4 +146,4 @@ async function main() {
   }
 }
 
-main();
+main().catch(console.error);

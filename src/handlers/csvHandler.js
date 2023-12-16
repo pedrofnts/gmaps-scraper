@@ -36,13 +36,7 @@ function loadExistingPlaceIds(filePath) {
 }
 
 function appendToCSV(record, stringifier, filePath) {
-  if (!existingPlaceIds.has(record.place_id)) {
-    console.log(`Appending record for place ID: ${record.place_id}`);
-    fs.appendFile(filePath, stringifier.stringifyRecords([record]), (err) => {
-      if (err) throw err;
-    });
-    existingPlaceIds.add(record.place_id);
-  }
+  console.log(`Appending record for place ID: ${record.place_id}`);
 
   try {
     fs.appendFileSync(filePath, stringifier.stringifyRecords([record]));

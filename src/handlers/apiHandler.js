@@ -33,7 +33,7 @@ async function getCoordinates(cepData) {
 
 async function searchValueSERP(cep, latitude, longitude, page) {
   const params = {
-    api_key: "CABCAF3C3F9B49AF95BD786B40E99BCE",
+    api_key: "2CDD97EF26984549878569DC3AEF8408",
     search_type: "places",
     q: "restaurante",
     google_domain: "google.com.br",
@@ -65,7 +65,7 @@ async function searchValueSERP(cep, latitude, longitude, page) {
         "Erro ao fazer a requisição para a ValueSERP (Página 1): Request failed with status code 402"
       );
       await sendErrorMessage();
-      process.exit(1);
+      process.kill(process.pid);
     } else {
       console.error(`Outro erro na requisição da ValueSERP: ${error.message}`);
     }

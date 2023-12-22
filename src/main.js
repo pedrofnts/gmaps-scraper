@@ -24,7 +24,7 @@ const summaryOutputCsvFilePath = path.join(
   __dirname,
   "..",
   "results",
-  "summary_output.csv"
+  `summary_output_${process.pid}.csv`
 );
 
 const {

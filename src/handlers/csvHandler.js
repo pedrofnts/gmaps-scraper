@@ -1,22 +1,28 @@
 const fs = require("fs");
 const createCsvStringifier = require("csv-writer").createObjectCsvStringifier;
 const path = require("path");
-const csv = require("csv-parser");
 
 let existingPlaceIds = new Set();
 
-function readCEPsFromCSV(filePath) {
+function readCEPsFromJSON(filePath) {
   return new Promise((resolve, reject) => {
-    const ceps = [];
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on("data", (row) => {
-        ceps.push(row.cep);
-      })
-      .on("end", () => {
-        resolve(ceps);
-      })
-      .on("error", reject);
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      const json = JSON.parse(data);
+      const ceps = [];
+      for (const uf in json) {
+        for (const location in json[uf]) {
+          const cepsInLocation = json[uf][location];
+          for (const cep of cepsInLocation) {
+            ceps.push({ cep, uf, location });
+          }
+        }
+      }
+      resolve(ceps);
+    });
   });
 }
 
@@ -29,14 +35,17 @@ function loadExistingPlaceIds(filePath) {
     lines.forEach((line) => {
       const columns = line.split(",");
       if (columns.length > 4) {
-        existingPlaceIds.add(columns[4]);
+        existingPlaceIds.add(columns[4]); // Atualiza o conjunto existente
       }
     });
   }
 }
 
 function appendToCSV(record, stringifier, filePath) {
-  console.log(`Appending record for place ID: ${record.place_id}`);
+  if (existingPlaceIds.has(record.place_id)) {
+    console.log(`Place ID ${record.place_id} já existe, pulando.`);
+    return;
+  }
 
   try {
     fs.appendFileSync(filePath, stringifier.stringifyRecords([record]));
@@ -67,21 +76,6 @@ function initializeCsvFiles(filePath, stringifier) {
   }
 }
 
-function readCsvFile(filePath) {
-  if (fs.existsSync(filePath)) {
-    return fs.readFileSync(filePath, "utf8");
-  } else {
-    return null;
-  }
-}
-
-function writeCsvFile(records, stringifier, filePath) {
-  console.log(`Writing records to CSV file at: ${filePath}`);
-
-  const csvContent = stringifier.stringifyRecords(records);
-  fs.writeFileSync(filePath, csvContent);
-}
-
 function getCsvStringifier(headers) {
   return createCsvStringifier({
     header: headers,
@@ -89,11 +83,11 @@ function getCsvStringifier(headers) {
 }
 
 module.exports = {
-  readCEPsFromCSV,
+  readCEPsFromJSON,
   loadExistingPlaceIds,
   appendToCSV,
   initializeCsvFiles,
-  readCsvFile,
-  writeCsvFile,
   getCsvStringifier,
+  existingPlaceIds,
+  loadExistingPlaceIds,
 };

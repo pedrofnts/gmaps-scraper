@@ -1,37 +1,46 @@
 const axios = require("axios");
 
-async function getCoordinates(cep) {
+async function getCoordinates(cepData) {
+  const { cep, uf, location } = cepData;
   console.log(`Consultando CEP: ${cep}`);
   try {
     const response = await axios.get(
       `https://brasilapi.com.br/api/cep/v2/${cep}`
     );
     console.log(`CEP ${cep}: Sucesso na requisição.`);
+
+    if (response.data.name === "CepPromiseError") {
+      console.log(`Erro 'CepPromiseError' encontrado para o CEP: ${cep}`);
+      return null;
+    }
+
     const { latitude, longitude } = response.data.location.coordinates;
     const { city, state } = response.data;
-    return { latitude, longitude, city, state, status: "Success" };
+    return {
+      latitude,
+      longitude,
+      location,
+      city,
+      state,
+      uf,
+      status: "Success",
+    };
   } catch (error) {
     console.error(`Erro ao consultar o CEP ${cep}:`, error.message);
-    return {
-      latitude: null,
-      longitude: null,
-      city: null,
-      state: null,
-      status: "Failed",
-    };
+    return null;
   }
 }
 
-async function searchValueSERP(latitude, longitude, page) {
+async function searchValueSERP(cep, latitude, longitude, page) {
   const params = {
-    api_key: "5B294ADCEB7E4E1C93355F07183302DA",
+    api_key: "CABCAF3C3F9B49AF95BD786B40E99BCE",
     search_type: "places",
     q: "restaurante",
     google_domain: "google.com.br",
     gl: "br",
     hl: "pt-br",
     output: "json",
-    location: `lat:${latitude},lon:${longitude},zoom:15`,
+    location: `lat:${latitude},lon:${longitude},zoom:20`,
     page,
   };
 
@@ -45,17 +54,50 @@ async function searchValueSERP(latitude, longitude, page) {
       console.log(
         `ValueSERP Página ${page}: ${response.data.places_results.length} resultados encontrados.`
       );
-      return response.data;
+      return { ...response.data, cep };
     } else {
       console.log(`ValueSERP Página ${page}: Resposta sem dados úteis.`);
       return null;
     }
   } catch (error) {
-    console.error(
-      `Erro ao fazer a requisição para a ValueSERP (Página ${page}):`,
-      error.message
+    if (error.response && error.response.status === 402) {
+      console.error(
+        "Erro ao fazer a requisição para a ValueSERP (Página 1): Request failed with status code 402"
+      );
+      await sendErrorMessage();
+      process.exit(1);
+    } else {
+      console.error(`Outro erro na requisição da ValueSERP: ${error.message}`);
+    }
+  }
+}
+
+async function sendErrorMessage() {
+  try {
+    const response = await axios.post(
+      "https://evo.pmcholding.com.br/message/sendText/goclinica",
+      {
+        number: "5579991036669",
+        options: {
+          delay: 1200,
+          presence: "composing",
+          linkPreview: false,
+        },
+        textMessage: {
+          text: "Execução interrompida",
+        },
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          apikey: "d7eaddf3431f909a7e22c57a72967bef",
+        },
+      }
     );
-    return null;
+
+    console.log("Mensagem de erro enviada com sucesso", response.data);
+  } catch (error) {
+    console.error("Erro ao enviar mensagem de erro", error.message);
   }
 }
 

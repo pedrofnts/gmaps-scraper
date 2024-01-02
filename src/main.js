@@ -99,7 +99,7 @@ async function main() {
       // Verifica a diferença entre o CEP atual e o anterior
       if (currentCep - previousCep < 20) {
         originalCep = currentCep; // Armazena o CEP original antes de incrementar
-        currentCep = previousCep + 20; // Incrementa o CEP atual
+        currentCep = previousCep + 100; // Incrementa o CEP atual
         cepData.cep = currentCep.toString(); // Atualiza o CEP no objeto cepData
       }
 
@@ -107,7 +107,11 @@ async function main() {
 
       const coordinates = await getCoordinates(cepData);
 
-      if (!coordinates) {
+      if (
+        !coordinates ||
+        coordinates.latitude === null ||
+        coordinates.longitude === null
+      ) {
         // Se 'getCoordinates' retornar null, pula para o próximo CEP
         console.log(`Pulando CEP ${cepData.cep} devido a erro.`);
         continue; // Usa 'continue' para pular para a próxima iteração do loop

@@ -66,7 +66,7 @@ async function searchValueSERP(cep, latitude, longitude, page) {
       );
       await sendErrorMessage();
       process.kill(process.pid);
-    } else {
+    } else {f
       console.error(`Outro erro na requisição da ValueSERP: ${error.message}`);
     }
   }

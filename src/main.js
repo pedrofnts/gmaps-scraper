@@ -123,16 +123,21 @@ async function main() {
         skipCep = true;
       }
 
-      if (!skipCep) {
-        const { latitude, longitude, city, state, status } = coordinates;
+      let latitude = "N/A"; // Valor padrão
+      let longitude = "N/A"; // Valor padrão
 
+      if (!skipCep) {
+        const coords = await getCoordinates(cepData);
         if (
-          status !== "Success" ||
-          latitude === undefined ||
-          longitude === undefined
+          coords.status !== "Success" ||
+          coords.latitude === undefined ||
+          coords.longitude === undefined
         ) {
           reasonForSkipping = "Coordenadas não disponíveis ou undefined";
           skipCep = true;
+        } else {
+          latitude = coords.latitude;
+          longitude = coords.longitude;
         }
 
         let continueFetching = !skipCep;

@@ -1,5 +1,4 @@
 const path = require("path");
-const fs = require("fs");
 
 require("dotenv").config({ path: "../.env" });
 
@@ -20,17 +19,11 @@ const outputCsvFilePath = path.join(
   "results",
   `${state}_output.csv`
 );
-const summaryOutputCsvFilePath = path.join(
-  __dirname,
-  "..",
-  "results",
-  `summary_output_${process.pid}.csv`
-);
 
 const {
   appendToCSV,
-  loadExistingPlaceIds,
   initializeCsvFiles,
+  loadExistingPlaceIds,
   getCsvStringifier,
   readCEPsFromJSON,
   existingPlaceIds,
@@ -55,40 +48,13 @@ const csvStringifier = getCsvStringifier([
   { id: "location", title: "Location" },
 ]);
 
-const summaryCsvStringifier = getCsvStringifier([
-  { id: "cep", title: "CEP" },
-  { id: "latitude", title: "Latitude" },
-  { id: "longitude", title: "Longitude" },
-  { id: "status", title: "Status" },
-  { id: "num_restaurants", title: "Number of Restaurants" },
-  { id: "uf", title: "UF" },
-  { id: "location", title: "Location" },
-]);
-
 initializeCsvFiles(outputCsvFilePath, csvStringifier);
-initializeCsvFiles(summaryOutputCsvFilePath, summaryCsvStringifier);
 
 loadExistingPlaceIds(outputCsvFilePath);
-
-function loadExistingCEPs(filePath) {
-  let existingCEPs = new Set();
-  if (fs.existsSync(filePath)) {
-    const data = fs.readFileSync(filePath, "utf8");
-    const lines = data.split("\n");
-    lines.forEach((line) => {
-      const columns = line.split(",");
-      if (columns.length > 0) {
-        existingCEPs.add(columns[0]);
-      }
-    });
-  }
-  return existingCEPs;
-}
 
 async function main() {
   try {
     const ceps = await readCEPsFromJSON(jsonFilePath);
-    const existingCEPs = loadExistingCEPs(summaryOutputCsvFilePath);
 
     let previousCep = 0;
     let originalCep = 0;
@@ -104,41 +70,31 @@ async function main() {
 
       previousCep = originalCep;
 
-      const coordinates = await getCoordinates(cepData);
+      const coords = await getCoordinates(cepData);
 
-      if (
-        !coordinates ||
-        coordinates.latitude === null ||
-        coordinates.longitude === null
-      ) {
+      if (!coords || coords.latitude === null || coords.longitude === null) {
         console.log(`Pulando CEP ${cepData.cep} devido a erro.`);
         continue;
       }
+
       let skipCep = false;
-      let reasonForSkipping = "";
-      let numRestaurants = 0;
-
-      if (existingCEPs.has(cepData.cep)) {
-        reasonForSkipping = "CEP já existe no resumo";
-        skipCep = true;
-      }
-
-      let latitude = "N/A"; // Valor padrão
-      let longitude = "N/A"; // Valor padrão
-      let status = "Unknown"; // Valor padrão
+      let latitude = "N/A";
+      let longitude = "N/A";
+      let city = "Desconhecida";
+      let state = "Desconhecido";
 
       if (!skipCep) {
-        const coords = await getCoordinates(cepData);
         if (
           coords.status !== "Success" ||
-          coords.latitude === undefined ||
-          coords.longitude === undefined
+          !coords.latitude ||
+          !coords.longitude
         ) {
-          reasonForSkipping = "Coordenadas não disponíveis ou undefined";
           skipCep = true;
         } else {
           latitude = coords.latitude;
           longitude = coords.longitude;
+          city = coords.city;
+          state = coords.state;
         }
 
         let continueFetching = !skipCep;
@@ -186,7 +142,6 @@ async function main() {
               }
             }
 
-            numRestaurants += response.places_results.length;
             continueFetching =
               newPlaceIdFound &&
               response.places_results.length === 20 &&
@@ -197,22 +152,6 @@ async function main() {
           }
         }
       }
-
-      const summaryRecord = {
-        cep: cepData.cep,
-        latitude: skipCep ? "N/A" : latitude,
-        longitude: skipCep ? "N/A" : longitude,
-        status: skipCep ? "Skipped: " + reasonForSkipping : status,
-        num_restaurants: numRestaurants,
-        uf: cepData.uf,
-        location: cepData.location,
-      };
-      appendToCSV(
-        summaryRecord,
-        summaryCsvStringifier,
-        summaryOutputCsvFilePath
-      );
-      existingCEPs.add(cepData.cep);
     }
     console.log("Processo concluído.");
   } catch (error) {

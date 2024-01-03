@@ -8,6 +8,7 @@ async function getCoordinates(cepData) {
       `https://brasilapi.com.br/api/cep/v2/${cep}`
     );
     console.log(`CEP ${cep}: Sucesso na requisição.`);
+    console.log(`Resposta da Brasil API para o CEP ${cep}:`, response.data); // Imprime a resposta
 
     if (response.data.name === "CepPromiseError") {
       console.log(`Erro 'CepPromiseError' encontrado para o CEP: ${cep}`);
@@ -66,7 +67,8 @@ async function searchValueSERP(cep, latitude, longitude, page) {
       );
       await sendErrorMessage();
       process.kill(process.pid);
-    } else {f
+    } else {
+      f;
       console.error(`Outro erro na requisição da ValueSERP: ${error.message}`);
     }
   }

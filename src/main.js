@@ -90,17 +90,16 @@ async function main() {
     const ceps = await readCEPsFromJSON(jsonFilePath);
     const existingCEPs = loadExistingCEPs(summaryOutputCsvFilePath);
 
-    let previousCep = 0; // Inicializa uma variável para armazenar o CEP anterior
-    let originalCep = 0; // Inicializa uma variável para armazenar o CEP original
+    let previousCep = 0;
+    let originalCep = 0;
 
     for (const cepData of ceps) {
-      let currentCep = parseInt(cepData.cep); // Converte o CEP atual para um número
+      let currentCep = parseInt(cepData.cep);
 
-      // Verifica a diferença entre o CEP atual e o anterior
       if (currentCep - previousCep < 20) {
-        originalCep = currentCep; // Armazena o CEP original antes de incrementar
-        currentCep = previousCep + 100; // Incrementa o CEP atual
-        cepData.cep = currentCep.toString(); // Atualiza o CEP no objeto cepData
+        originalCep = currentCep;
+        currentCep = previousCep + 100;
+        cepData.cep = currentCep.toString();
       }
 
       previousCep = originalCep;
@@ -112,9 +111,8 @@ async function main() {
         coordinates.latitude === null ||
         coordinates.longitude === null
       ) {
-        // Se 'getCoordinates' retornar null, pula para o próximo CEP
         console.log(`Pulando CEP ${cepData.cep} devido a erro.`);
-        continue; // Usa 'continue' para pular para a próxima iteração do loop
+        continue;
       }
       let skipCep = false;
       let reasonForSkipping = "";
@@ -125,72 +123,72 @@ async function main() {
         skipCep = true;
       }
 
-      const { latitude, longitude, city, state, status } = await getCoordinates(
-        cepData
-      );
-      if (
-        !skipCep &&
-        (status !== "Success" ||
+      if (!skipCep) {
+        const { latitude, longitude, city, state, status } = coordinates;
+
+        if (
+          status !== "Success" ||
           latitude === undefined ||
-          longitude === undefined)
-      ) {
-        reasonForSkipping = "Coordenadas não disponíveis ou undefined";
-        skipCep = true;
-      }
+          longitude === undefined
+        ) {
+          reasonForSkipping = "Coordenadas não disponíveis ou undefined";
+          skipCep = true;
+        }
 
-      let continueFetching = !skipCep;
-      let currentPage = 1;
-      let existingPlaceIdCount = 0;
+        let continueFetching = !skipCep;
+        let currentPage = 1;
+        let existingPlaceIdCount = 0;
 
-      while (continueFetching) {
-        const response = await searchValueSERP(
-          cepData.cep,
-          latitude,
-          longitude,
-          currentPage
-        );
+        while (continueFetching) {
+          const response = await searchValueSERP(
+            cepData.cep,
+            latitude,
+            longitude,
+            currentPage
+          );
 
-        if (response && response.places_results) {
-          let newPlaceIdFound = false;
+          if (response && response.places_results) {
+            let newPlaceIdFound = false;
 
-          for (const place of response.places_results) {
-            if (!place.place_id) {
-              console.log("Place ID undefined encontrado na resposta da API");
-              continue;
+            for (const place of response.places_results) {
+              if (!place.place_id) {
+                console.log("Place ID undefined encontrado na resposta da API");
+                continue;
+              }
+
+              if (!existingPlaceIds.has(place.place_id)) {
+                newPlaceIdFound = true;
+                const record = {
+                  cep: cepData.cep,
+                  position: place.position,
+                  title: place.title,
+                  link: place.link,
+                  place_id: place.place_id,
+                  address: place.address,
+                  city,
+                  state,
+                  phone: place.phone,
+                  rating: place.rating,
+                  reviews: place.reviews,
+                  latitude: place.gps_coordinates.latitude,
+                  longitude: place.gps_coordinates.longitude,
+                };
+                appendToCSV(record, csvStringifier, outputCsvFilePath);
+                existingPlaceIds.add(place.place_id);
+              } else {
+                existingPlaceIdCount++;
+              }
             }
 
-            if (!existingPlaceIds.has(place.place_id)) {
-              newPlaceIdFound = true;
-              const record = {
-                cep: cepData.cep,
-                position: place.position,
-                title: place.title,
-                link: place.link,
-                place_id: place.place_id,
-                address: place.address,
-                city,
-                state,
-                phone: place.phone,
-                rating: place.rating,
-                reviews: place.reviews,
-                latitude: place.gps_coordinates.latitude,
-                longitude: place.gps_coordinates.longitude,
-              };
-              appendToCSV(record, csvStringifier, outputCsvFilePath);
-              existingPlaceIds.add(place.place_id);
-            } else {
-              existingPlaceIdCount++;
-            }
+            numRestaurants += response.places_results.length;
+            continueFetching =
+              newPlaceIdFound &&
+              response.places_results.length === 20 &&
+              existingPlaceIdCount <= 15;
+            currentPage++;
+          } else {
+            continueFetching = false;
           }
-
-          numRestaurants += response.places_results.length;
-          continueFetching =
-            newPlaceIdFound &&
-            response.places_results.length === 20 &&
-            existingPlaceIdCount <= 15;
-          currentPage++;
-        } else {
-          continueFetching = false;
         }
       }
 

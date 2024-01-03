@@ -125,6 +125,7 @@ async function main() {
 
       let latitude = "N/A"; // Valor padrão
       let longitude = "N/A"; // Valor padrão
+      let status = "Unknown"; // Valor padrão
 
       if (!skipCep) {
         const coords = await getCoordinates(cepData);
